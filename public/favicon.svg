@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <rect width="100" height="100" rx="24" fill="url(#grad)" />
+  <path d="M50 20C33.4315 20 20 33.4315 20 50C20 66.5685 33.4315 80 50 80C66.5685 80 80 66.5685 80 50C80 33.4315 66.5685 20 50 20Z" fill="white" fill-opacity="0.1" />
+  <!-- Medical Cross & Pulse -->
+  <path d="M42 32H58V42H68V58H58V68H42V58H32V42H42V32Z" fill="white" fill-opacity="0.2" />
+  <path d="M28 50H38L43 38L50 62L56 44L61 50H72" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+  <defs>
+    <linearGradient id="grad" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0284C7" />
+      <stop offset="1" stop-color="#0D9488" />
+    </linearGradient>
+  </defs>
+</svg>
