@@ -21,6 +21,7 @@ import DevToolbar from './DevToolbar';
 import StudentProfile from './StudentProfile';
 import VideoLibrary from './VideoLibrary';
 import TicketArea from './TicketArea';
+import { useAuth } from '../context/AuthContext';
 
 export default function StudentLayout({
   currentUser,
@@ -67,8 +68,12 @@ export default function StudentLayout({
     handleNavClick('tickets');
   };
 
-  const isProMax = userPlan === 'promax' || currentUser?.plan === 'promax';
-  const isAdmin = currentUser?.role === 'admin';
+  const { user, role, isSuperadmin, isPremium } = useAuth();
+  const effectiveEmail = currentUser?.email || user?.email || '';
+  const isTargetSuperadmin = effectiveEmail.toLowerCase().trim() === 'gorkaobiangolaso@gmail.com' || isSuperadmin || role === 'superadmin' || currentUser?.role === 'superadmin';
+
+  const isProMax = userPlan === 'promax' || currentUser?.plan === 'promax' || isPremium || isTargetSuperadmin;
+  const isAdmin = currentUser?.role === 'admin' || isTargetSuperadmin;
 
   const navItems = [
     {
@@ -250,24 +255,27 @@ export default function StudentLayout({
             </h2>
           </div>
 
-          <div className="flex items-center gap-4">
-            {/* Visual indicator mode badge */}
-            {isAdmin ? (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-extrabold bg-rose-50 text-rose-700 border border-rose-300">
-                <Lock className="w-3.5 h-3.5 text-rose-600" />
-                <span>Modo: Admin (Gorka)</span>
+          <div className="flex items-center gap-3">
+            {/* Monthly Subscription Status Badge */}
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1.5 rounded-full text-xs font-extrabold flex items-center gap-1.5 border bg-emerald-50 text-emerald-800 border-emerald-300">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Suscripción: Activa</span>
               </span>
-            ) : isProMax ? (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-extrabold bg-amber-100 text-amber-900 border border-amber-300">
-                <Zap className="w-3.5 h-3.5 text-amber-600 fill-amber-600" />
-                <span>Modo: Alumno PRO MAX</span>
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                <User className="w-3.5 h-3.5 text-slate-500" />
-                <span>Modo: Alumno Estándar</span>
-              </span>
-            )}
+            </div>
+
+            {/* Manage Subscription Button (Stripe Customer Portal) */}
+            <a
+              href="https://billing.stripe.com/p/login/test"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+              title="Gestionar tu plan y pagos en el Stripe Customer Portal"
+            >
+              <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+              <span>Gestionar suscripción</span>
+              <Sparkles className="w-3 h-3 text-amber-300" />
+            </a>
 
             <button
               onClick={() => handleNavClick('perfil')}

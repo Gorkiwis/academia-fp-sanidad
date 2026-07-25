@@ -7,7 +7,10 @@ import Campus from './pages/Campus';
 import Admin from './pages/Admin';
 import RecuperarPassword from './pages/RecuperarPassword';
 import ActualizarPassword from './pages/ActualizarPassword';
+import Pricing from './components/Pricing';
+import SubscriptionGuard from './components/SubscriptionGuard';
 import { supabase } from './lib/supabase';
+import { AuthProvider } from './context/AuthContext';
 
 const GRADOS = [
   'Anatomía Patológica y Citodiagnóstico',
@@ -76,6 +79,12 @@ function Home() {
             <span>Sanidad <span className="text-blue-600">10</span></span>
           </Link>
           <div className="flex items-center gap-3">
+            <a
+              href="#precios"
+              className="text-slate-700 hover:text-slate-900 font-semibold text-sm px-3 py-2 transition-colors"
+            >
+              Planes y Precios
+            </a>
             <Link
               to="/login"
               className="text-slate-700 hover:text-slate-900 font-medium text-sm px-4 py-2 rounded-lg border border-slate-300 hover:bg-slate-100 transition-colors"
@@ -94,12 +103,12 @@ function Home() {
 
       <main style={styles.mainContent}>
         <section id="registro" style={styles.heroSection}>
-          <div style={styles.badge}>Campus Virtual en Desarrollo · Convocatoria 2026/2027</div>
+          <div style={styles.badge}>Campus Virtual Activo · Convocatoria 2026/2027</div>
           <h1 style={styles.heroTitle}>
-            Preparación Especializada para Formación Profesional de Sanidad
+            Academia de FP de Sanidad: Refuerzo Especializado en Formación Profesional Sanitaria
           </h1>
           <p style={styles.heroSubtitle}>
-            Plataforma de alto rendimiento académico para ciclos de Grado Superior y Grado Medio de la familia sanitaria. Temarios oficializados, banco de test explicados y simulacros de examen reales.
+            Plataforma líder en refuerzo especializado para alumnos de ciclos de Grado Superior y Grado Medio de Sanidad. Temarios sintetizados en PDF, videoteca HD y tutorías con resolución de dudas por docentes en activo.
           </p>
 
           <div style={styles.formCard}>
@@ -162,9 +171,9 @@ function Home() {
         </section>
 
         <section style={styles.featuresSection}>
-          <h2 style={styles.sectionTitle}>Optimizado para el Máximo Rendimiento en FP Sanitaria</h2>
+          <h2 style={styles.sectionTitle}>Refuerzo en Formación Profesional de Sanidad Diseñado para tu Aprobado</h2>
           <p style={styles.sectionSubtitle}>
-            Diseñado por profesionales en activo y especialistas docentes de la rama socio-sanitaria.
+            Diseñado por profesionales en activo y especialistas docentes de la rama socio-sanitaria para ofrecer el mejor refuerzo escolar de FP.
           </p>
 
           <div style={styles.featuresGrid}>
@@ -192,9 +201,9 @@ function Home() {
         </section>
 
         <section style={styles.degreesSection}>
-          <h2 style={styles.sectionTitle}>Ciclos Formativos Soportados</h2>
+          <h2 style={styles.sectionTitle}>Refuerzo Académico para Ciclos Formativos de Grado Medio y Superior</h2>
           <p style={styles.sectionSubtitle}>
-            Preparación adaptada a la normativa vigente de los títulos de la familia profesional Sanidad:
+            Nuestra academia de FP de sanidad cuenta con preparación adaptada a la normativa vigente de la familia sanitaria:
           </p>
 
           <div style={styles.degreesList}>
@@ -211,14 +220,24 @@ function Home() {
           </div>
         </section>
 
+        {/* Sección de Precios con Suscripción Mensual por número de módulos */}
+        <Pricing />
+
         <section style={styles.faqSection}>
           <h2 style={styles.sectionTitle}>Preguntas Frecuentes sobre FP Sanidad 10</h2>
           
           <div style={styles.faqContainer}>
             <article style={styles.faqItem}>
-              <h3 style={styles.faqQuestion}>¿Cuándo estará disponible la plataforma?</h3>
+              <h3 style={styles.faqQuestion}>¿Hay alguna cuota de inscripción o matrícula inicial?</h3>
               <p style={styles.faqAnswer}>
-                Estamos completando la fase final de auditoría del contenido didáctico. Los usuarios registrados en la lista de reserva recibirán una invitación exclusiva de acceso anticipado antes del lanzamiento público general.
+                No. Nuestro modelo se basa 100% en suscripción mensual recurrente por el número de módulos que necesites preparar. No pagas ninguna matrícula inicial (0 € cuota de alta) y puedes cancelar cuando desees.
+              </p>
+            </article>
+
+            <article style={styles.faqItem}>
+              <h3 style={styles.faqQuestion}>¿Cómo elijo los módulos de mi plan de suscripción?</h3>
+              <p style={styles.faqAnswer}>
+                Al suscribirte en el Plan Básico eliges 1 módulo de FP. En el Plan Profesional eliges entre 2 y 3 módulos. Con el Plan Total tienes acceso ilimitado e instantáneo a todas las asignaturas del ciclo formativo.
               </p>
             </article>
 
@@ -226,13 +245,6 @@ function Home() {
               <h3 style={styles.faqQuestion}>¿El temario sirve para las Pruebas Libres de FP de Sanidad?</h3>
               <p style={styles.faqAnswer}>
                 Sí. Toda la estructura modular está redactada tomando como referencia los Reales Decretos de título mínimo de cada especialidad sanitaria, permitiendo preparar con garantías tanto las Pruebas Libres autonómicas como las evaluaciones continuas en centros oficiales.
-              </p>
-            </article>
-
-            <article style={styles.faqItem}>
-              <h3 style={styles.faqQuestion}>¿Qué ventajas tiene registrarse en la lista de espera?</h3>
-              <p style={styles.faqAnswer}>
-                El registro garantiza la reserva de plaza con tarifa promocional reducida para el primer año académico, además de acceso a simulacros de prueba gratuitos previa apertura del campus.
               </p>
             </article>
           </div>
@@ -245,7 +257,7 @@ function Home() {
             © {new Date().getFullYear()} FP Sanidad 10. Todos los derechos reservados.
           </p>
           <p style={styles.legalText}>
-            De conformidad con el RGPD (UE 2016/679) y la LOPDGDD 3/2018, los datos recopilados serán procesados exclusivamente con la finalidad de gestionar su solicitud de acceso prioritario al campus virtual.
+            De conformidad con el RGPD (UE 2016/679) y la LOPDGDD 3/2018, los datos recopilados serán procesados exclusivamente con la finalidad de gestionar su solicitud de acceso al campus virtual.
           </p>
         </div>
       </footer>
@@ -255,18 +267,35 @@ function Home() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/colabora" element={<Colabora />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/campus" element={<Campus />} />
-        <Route path="/admin" element={<Admin />} />
-        <Route path="/recuperar-password" element={<RecuperarPassword />} />
-        <Route path="/actualizar-password" element={<ActualizarPassword />} />
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/colabora" element={<Colabora />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route
+            path="/campus/*"
+            element={
+              <SubscriptionGuard>
+                <Campus />
+              </SubscriptionGuard>
+            }
+          />
+          <Route
+            path="/campus"
+            element={
+              <SubscriptionGuard>
+                <Campus />
+              </SubscriptionGuard>
+            }
+          />
+          <Route path="/admin" element={<Admin />} />
+          <Route path="/recuperar-password" element={<RecuperarPassword />} />
+          <Route path="/actualizar-password" element={<ActualizarPassword />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 

@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   BookOpen,
   CheckCircle2,
   Zap,
   Clock,
   RefreshCw,
-  GraduationCap
+  GraduationCap,
+  Layers,
+  ExternalLink,
+  ShieldCheck
 } from 'lucide-react';
 import StudentLayout from '../components/StudentLayout';
 import DripModuleCard from '../components/DripModuleCard';
+import { useAuth } from '../context/AuthContext';
 
 const SAMPLE_MODULES = [
   {
@@ -55,7 +59,22 @@ const SAMPLE_MODULES = [
 ];
 
 export default function Campus({ currentUser, onSelectUser, userPlan = 'free', setUserPlan, initialView = 'temario' }) {
-  const isProMax = userPlan === 'promax' || currentUser?.plan === 'promax';
+  const navigate = useNavigate();
+  const {
+    user,
+    role,
+    isSuperadmin,
+    isPremium,
+    subscriptionStatus,
+    subscribedModuleIds,
+    planType,
+    updateSubscribedModules,
+    isSubscriptionActive
+  } = useAuth();
+
+  const effectiveEmail = currentUser?.email || user?.email || '';
+  const isTargetSuperadmin = effectiveEmail.toLowerCase().trim() === 'gorkaobiangolaso@gmail.com' || isSuperadmin || role === 'superadmin' || currentUser?.role === 'superadmin';
+  const isProMax = userPlan === 'promax' || currentUser?.plan === 'promax' || isPremium || isTargetSuperadmin;
 
   const sectionMap = {
     profile: 'perfil',
@@ -67,7 +86,13 @@ export default function Campus({ currentUser, onSelectUser, userPlan = 'free', s
   };
   const mappedSection = sectionMap[initialView] || 'temario';
 
-  // State for user subscription date (defaults to 3 days ago for testing drip logic)
+  // State for simulated module subscription (defaults to context state or 'mod_1', 'mod_2')
+  const [activePlanType, setActivePlanType] = useState(planType || 'pro'); // 'basic', 'pro', 'total'
+  const [activeSubscribedModules, setActiveSubscribedModules] = useState(() => {
+    return subscribedModuleIds || ['mod_1', 'mod_2'];
+  });
+
+  // State for user subscription date
   const [subscriptionDaysAgo, setSubscriptionDaysAgo] = useState(3);
   const userSubscriptionDate = new Date(Date.now() - subscriptionDaysAgo * 24 * 60 * 60 * 1000).toISOString();
 
@@ -90,9 +115,25 @@ export default function Campus({ currentUser, onSelectUser, userPlan = 'free', s
     });
   };
 
-  const handleResetUnlocks = () => {
-    localStorage.removeItem('academia_unlocked_modules');
-    setUnlockedModules([]);
+  const handleSelectSimulatedPlan = (pType) => {
+    setActivePlanType(pType);
+    if (pType === 'basic') {
+      const basicMods = ['mod_1'];
+      setActiveSubscribedModules(basicMods);
+      if (updateSubscribedModules) updateSubscribedModules(basicMods, 'basic');
+    } else if (pType === 'pro') {
+      const proMods = ['mod_1', 'mod_2'];
+      setActiveSubscribedModules(proMods);
+      if (updateSubscribedModules) updateSubscribedModules(proMods, 'pro');
+    } else if (pType === 'total') {
+      const totalMods = ['all'];
+      setActiveSubscribedModules(totalMods);
+      if (updateSubscribedModules) updateSubscribedModules(totalMods, 'total');
+    }
+  };
+
+  const handleUpgradePlan = (mod) => {
+    window.open('https://billing.stripe.com/p/login/test', '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -106,80 +147,92 @@ export default function Campus({ currentUser, onSelectUser, userPlan = 'free', s
       {/* Visor / Temario View Content */}
       <div className="w-full max-w-5xl mx-auto space-y-6 text-left animate-fadeIn">
         
-        {/* Welcome & Drip Info Banner */}
-        <div className={`bg-white rounded-2xl border p-6 sm:p-8 space-y-4 relative shadow-sm ${
-          isProMax ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-slate-200'
+        {/* Welcome & Subscription Status Banner */}
+        <div className={`bg-white rounded-2xl border p-6 sm:p-8 space-y-5 relative shadow-sm ${
+          activePlanType === 'total' ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-slate-200'
         }`}>
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-2">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium">
-                <CheckCircle2 className="w-3.5 h-3.5 text-slate-900" />
-                <span>Acceso Alumno Activo</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Suscripción Mensual Activa</span>
               </div>
-              {isProMax ? (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold">
-                  <Zap className="w-3.5 h-3.5 text-amber-600 fill-amber-600" />
-                  <span>PLAN PRO MAX DESBLOQUEADO</span>
-                </div>
-              ) : (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-800 text-xs font-medium">
-                  <Clock className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Sistema de Goteo (Drip Content) Activo</span>
-                </div>
-              )}
+              
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 text-white text-xs font-bold">
+                <Layers className="w-3.5 h-3.5 text-amber-400" />
+                <span>
+                  {activePlanType === 'basic' && 'Plan Básico (1 Módulo)'}
+                  {activePlanType === 'pro' && 'Plan Profesional (2-3 Módulos)'}
+                  {activePlanType === 'total' && 'Plan Total (Acceso Ilimitado)'}
+                </span>
+              </div>
             </div>
 
-            {/* Dev Controls for Testing Drip Content */}
-            {import.meta.env.DEV && (
-              <div className="flex items-center gap-2 text-xs bg-slate-100 p-1.5 rounded-lg border border-slate-200">
-                <span className="text-slate-500 text-[11px] font-semibold pl-1">Simular Antigüedad:</span>
-                <select
-                  value={subscriptionDaysAgo}
-                  onChange={(e) => setSubscriptionDaysAgo(Number(e.target.value))}
-                  className="bg-white border border-slate-300 text-slate-800 font-semibold rounded px-2 py-1 text-xs focus:outline-none"
-                >
-                  <option value={0}>0 días (Nuevo)</option>
-                  <option value={3}>3 días (Módulo 1 OK)</option>
-                  <option value={10}>10 días (Módulos 1 y 2 OK)</option>
-                  <option value={18}>18 días (Módulos 1, 2 y 3 OK)</option>
-                  <option value={25}>25 días (Todos desbloqueados)</option>
-                </select>
-                {unlockedModules.length > 0 && (
-                  <button
-                    onClick={handleResetUnlocks}
-                    className="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded"
-                    title="Reiniciar desbloqueos pagados"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            )}
+            {/* Dev Selector to Test Plan Switching & Uncontracted Modules */}
+            <div className="flex items-center gap-2 text-xs bg-slate-100 p-2 rounded-xl border border-slate-200">
+              <span className="text-slate-500 font-bold text-[11px] pl-1">Simular Plan Contratado:</span>
+              <button
+                onClick={() => handleSelectSimulatedPlan('basic')}
+                className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${
+                  activePlanType === 'basic' ? 'bg-blue-600 text-white shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                1 Módulo (Básico)
+              </button>
+              <button
+                onClick={() => handleSelectSimulatedPlan('pro')}
+                className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${
+                  activePlanType === 'pro' ? 'bg-blue-600 text-white shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                2-3 Módulos (Pro)
+              </button>
+              <button
+                onClick={() => handleSelectSimulatedPlan('total')}
+                className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${
+                  activePlanType === 'total' ? 'bg-amber-500 text-white shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                Todos (Total)
+              </button>
+            </div>
           </div>
 
-          <h2 className="text-2xl font-extrabold text-slate-900">¡Bienvenido a tu Campus Virtual!</h2>
-          <p className="text-slate-600 text-sm max-w-2xl leading-relaxed">
-            {isProMax
-              ? 'Con el Plan PRO MAX tienes desbloqueados todos los módulos y temas de forma inmediata con descarga completa de PDFs.'
-              : 'Los contenidos se liberan semanalmente según tu antigüedad de suscripción. ¿Necesitas un tema antes? Puedes realizar un **Desbloqueo Anticipado por 3,00 €**.'}
-          </p>
+          <div className="space-y-1">
+            <h2 className="text-2xl font-extrabold text-slate-900">
+              Módulos del Ciclo Formativo
+            </h2>
+            <p className="text-slate-600 text-sm max-w-3xl leading-relaxed">
+              Consulta los módulos contratados en tu suscripción mensual. Si deseas acceder a asignaturas adicionales, puedes realizar una ampliación de plan o desbloquear de forma anticipada.
+            </p>
+          </div>
         </div>
 
-        {/* Modules Grid with Drip Content Logic */}
+        {/* Modules Grid with Contracted vs Uncontracted (Bloqueado / Ampliar plan) */}
         <div className="space-y-4">
-          <h3 className="font-bold text-slate-900 text-sm uppercase tracking-wider">
-            Módulos del Curso ({SAMPLE_MODULES.length}):
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-slate-900 text-sm uppercase tracking-wider">
+              Listado de Módulos Sanitaria ({SAMPLE_MODULES.length}):
+            </h3>
+            <span className="text-xs text-slate-500 font-medium">
+              Suscripción por número de módulos (sin matrícula inicial)
+            </span>
+          </div>
+
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {SAMPLE_MODULES.map((mod) => (
               <DripModuleCard
                 key={mod.id}
                 module={mod}
+                subscribedModuleIds={activeSubscribedModules}
+                planType={activePlanType}
                 userSubscriptionDate={userSubscriptionDate}
                 unlockedModules={unlockedModules}
                 userPlan={userPlan}
+                isSubscriptionActive={isSubscriptionActive}
                 onUnlockModule={handleUnlockModule}
-                onOpenContent={(m) => alert(`Abriendo temario del ${m.title}`)}
+                onUpgradePlan={handleUpgradePlan}
+                onOpenContent={(m) => alert(`Accediendo al temario completo del ${m.title}`)}
               />
             ))}
           </div>

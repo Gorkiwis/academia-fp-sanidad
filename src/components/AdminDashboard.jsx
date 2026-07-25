@@ -3,7 +3,8 @@ import {
   Lock, ShieldCheck, Download, RefreshCw, Filter, 
   MessageSquare, CheckCircle2, Clock, Mail, GraduationCap, 
   Send, X, Sparkles, FileSpreadsheet, AlertCircle, LogOut,
-  DollarSign, TrendingUp, Users, UserPlus, BookOpen, Upload, KeyRound
+  DollarSign, TrendingUp, Users, UserPlus, BookOpen, Upload, KeyRound,
+  Plus, Edit3, Trash2, Globe, Tag, ExternalLink
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
@@ -21,7 +22,7 @@ const AVAILABLE_DEGREES = [
 export default function AdminDashboard({ onClose }) {
   const { user, role, assignedDegree, logout, loading: authLoading } = useAuth();
   
-  const isSuperadmin = role === 'superadmin';
+  const isSuperadmin = role === 'superadmin' || user?.email?.toLowerCase().trim() === 'gorkaobiangolaso@gmail.com';
   const isAuthor = role === 'author';
   const hasAdminAccess = isSuperadmin || isAuthor;
 

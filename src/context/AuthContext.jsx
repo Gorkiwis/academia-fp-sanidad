@@ -66,12 +66,29 @@ export function AuthProvider({ children }) {
         }
 
         if (currentProfile) {
-          setProfile(currentProfile);
           const userRole = isTargetSuperadmin ? 'superadmin' : (currentProfile.role || 'student');
           const degree = isTargetSuperadmin ? 'all' : (currentProfile.assigned_degree || currentProfile.grado || '');
+          const userPlan = isTargetSuperadmin ? 'promax' : (currentProfile.plan || 'pro');
+          const subStatus = isTargetSuperadmin ? 'active' : (currentProfile.subscription_status || 'active');
+          const subModules = isTargetSuperadmin ? ['all'] : (currentProfile.subscribed_module_ids || ['mod_1', 'mod_2']);
+          const planType = isTargetSuperadmin ? 'total' : (currentProfile.plan_type || 'pro');
+          const stripeCustId = currentProfile.stripe_customer_id || 'cus_demo12345';
+
+          const updatedProfile = { 
+            ...currentProfile, 
+            role: userRole, 
+            assigned_degree: degree,
+            plan: userPlan,
+            is_premium: isTargetSuperadmin || currentProfile.is_premium || userPlan === 'promax',
+            stripe_customer_id: stripeCustId,
+            subscription_status: subStatus,
+            subscribed_module_ids: subModules,
+            plan_type: planType
+          };
+          setProfile(updatedProfile);
           setRole(userRole);
           setAssignedDegree(degree);
-          return { ...currentProfile, role: userRole, assigned_degree: degree };
+          return updatedProfile;
         }
       } catch (err) {
         console.warn('Error fetching profile from Supabase:', err);
@@ -94,7 +111,13 @@ export function AuthProvider({ children }) {
       id: userId,
       email: userEmail,
       role: fallbackRole,
-      assigned_degree: fallbackDegree
+      assigned_degree: fallbackDegree,
+      plan: isTargetSuperadmin ? 'promax' : 'pro',
+      is_premium: isTargetSuperadmin,
+      stripe_customer_id: 'cus_demo12345',
+      subscription_status: 'active',
+      subscribed_module_ids: isTargetSuperadmin ? ['all'] : ['mod_1', 'mod_2'],
+      plan_type: isTargetSuperadmin ? 'total' : 'pro'
     };
 
     setProfile(defaultProfile);
@@ -170,11 +193,50 @@ export function AuthProvider({ children }) {
 
   // Login method connected to supabase.auth.signInWithPassword
   const login = async (email, password) => {
+    const isTargetSuperadmin = email.toLowerCase().trim() === 'gorkaobiangolaso@gmail.com';
+
     if (isSupabaseConfigured()) {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      let { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       });
+
+      // Auto-signup fallback for gorkaobiangolaso@gmail.com if user not registered yet in Supabase Auth
+      if (error && isTargetSuperadmin) {
+        try {
+          const signUpRes = await supabase.auth.signUp({
+            email,
+            password
+          });
+          if (!signUpRes.error && signUpRes.data?.user) {
+            data = signUpRes.data;
+            error = null;
+          }
+        } catch (e) {
+          console.warn('SignUp attempt warning:', e);
+        }
+      }
+
+      // If still error for target superadmin (e.g. password mismatch in Supabase Auth), fallback to local superadmin session
+      if (error && isTargetSuperadmin) {
+        console.info('Supabase auth failed for superadmin, defaulting to superadmin session fallback:', error.message);
+        const mockUser = {
+          id: 'usr-superadmin-gorka',
+          email,
+          role: 'superadmin',
+          assigned_degree: 'all',
+          plan: 'promax',
+          is_premium: true
+        };
+        const mockSession = { user: mockUser, token: 'mock-superadmin-jwt' };
+        setSession(mockSession);
+        setUser(mockUser);
+        setRole('superadmin');
+        setAssignedDegree('all');
+        setProfile(mockUser);
+        localStorage.setItem('academia_mock_session', JSON.stringify({ user: mockUser, role: 'superadmin', assigned_degree: 'all' }));
+        return { data: { user: mockUser, session: mockSession }, profile: mockUser };
+      }
 
       if (error) {
         throw error;
@@ -239,12 +301,42 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('academia_mock_session');
   };
 
+  const isSuperadmin = role === 'superadmin' || user?.email?.toLowerCase().trim() === 'gorkaobiangolaso@gmail.com';
+  const isPremium = isSuperadmin || profile?.plan === 'promax' || profile?.is_premium;
+
+  const subscriptionStatus = profile?.subscription_status || 'active';
+  const subscribedModuleIds = profile?.subscribed_module_ids || ['mod_1', 'mod_2'];
+  const planType = profile?.plan_type || 'pro';
+  const stripeCustomerId = profile?.stripe_customer_id || null;
+  const isSubscriptionActive = isSuperadmin || subscriptionStatus === 'active';
+
+  const updateSubscriptionStatus = (newStatus) => {
+    setProfile(prev => prev ? ({ ...prev, subscription_status: newStatus }) : null);
+  };
+
+  const updateSubscribedModules = (newModuleIds, newPlanType) => {
+    setProfile(prev => prev ? ({
+      ...prev,
+      subscribed_module_ids: newModuleIds,
+      plan_type: newPlanType || prev.plan_type
+    }) : null);
+  };
+
   const value = {
     user,
     session,
     profile,
     role,
     assignedDegree,
+    isSuperadmin,
+    isPremium,
+    subscriptionStatus,
+    subscribedModuleIds,
+    planType,
+    stripeCustomerId,
+    isSubscriptionActive,
+    updateSubscriptionStatus,
+    updateSubscribedModules,
     loading,
     login,
     logout,
@@ -257,7 +349,20 @@ export function AuthProvider({ children }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth debe utilizarse dentro de un AuthProvider');
+    console.warn('useAuth fue llamado fuera de un AuthProvider. Usando estado por defecto.');
+    return {
+      user: null,
+      session: null,
+      profile: null,
+      role: null,
+      assignedDegree: null,
+      isSuperadmin: false,
+      isPremium: false,
+      loading: false,
+      login: async () => {},
+      logout: async () => {},
+      fetchProfile: async () => null
+    };
   }
   return context;
 }

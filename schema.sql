@@ -1,16 +1,19 @@
 -- 1. Tabla de configuración del sitio para precios y URLs de checkout (Stripe)
 create table if not exists public.site_config (
   id text primary key default 'default_config',
-  plan_1_price text default '19',
-  plan_1_stripe_url text default '',
-  plan_2_price text default '39',
-  plan_2_stripe_url text default '',
+  plan_basic_price text default '19',
+  plan_basic_stripe_url text default 'https://buy.stripe.com/test_plan_basic',
+  plan_pro_price text default '39',
+  plan_pro_stripe_url text default 'https://buy.stripe.com/test_plan_pro',
+  plan_total_price text default '69',
+  plan_total_stripe_url text default 'https://buy.stripe.com/test_plan_total',
+  stripe_portal_url text default 'https://billing.stripe.com/p/login/test',
   updated_at timestamp with time zone default timezone('utc'::text, now())
 );
 
 -- Insertar fila inicial por defecto
-insert into public.site_config (id, plan_1_price, plan_1_stripe_url, plan_2_price, plan_2_stripe_url)
-values ('default_config', '19', 'https://buy.stripe.com/test_plan1', '39', 'https://buy.stripe.com/test_plan2')
+insert into public.site_config (id, plan_basic_price, plan_basic_stripe_url, plan_pro_price, plan_pro_stripe_url, plan_total_price, plan_total_stripe_url, stripe_portal_url)
+values ('default_config', '19', 'https://buy.stripe.com/test_plan_basic', '39', 'https://buy.stripe.com/test_plan_pro', '69', 'https://buy.stripe.com/test_plan_total', 'https://billing.stripe.com/p/login/test')
 on conflict (id) do nothing;
 
 
@@ -23,6 +26,10 @@ create table if not exists public.profiles (
   municipio text not null,
   centro_estudios text not null,
   role text default 'student',
+  stripe_customer_id text,
+  subscription_status text default 'active', -- 'active', 'canceled', 'past_due'
+  subscribed_module_ids text[] default '{"mod_1", "mod_2"}',
+  plan_type text default 'pro', -- 'basic' (1 mód), 'pro' (2-3 mód), 'total' (todos)
   created_at timestamp with time zone default timezone('utc'::text, now())
 );
 
@@ -41,9 +48,10 @@ create policy "Los usuarios pueden actualizar su propio perfil"
 create policy "Administradores tienen acceso total" 
   on public.profiles for select 
   using (
+    auth.jwt()->>'email' = 'gorkaobiangolaso@gmail.com' or
     exists (
       select 1 from public.profiles 
-      where id = auth.uid() and role = 'admin'
+      where id = auth.uid() and role in ('admin', 'superadmin')
     )
   );
 
@@ -71,16 +79,21 @@ create policy "Permitir crear tickets"
 -- Los alumnos pueden consultar sus propios tickets por email
 create policy "Los usuarios pueden ver sus propios tickets por email" 
   on public.tickets for select 
-  using (email = auth.jwt()->>'email' or exists (
-    select 1 from public.profiles where id = auth.uid() and role = 'admin'
-  ));
+  using (
+    email = auth.jwt()->>'email' or 
+    auth.jwt()->>'email' = 'gorkaobiangolaso@gmail.com' or
+    exists (
+      select 1 from public.profiles where id = auth.uid() and role in ('admin', 'superadmin')
+    )
+  );
 
 -- Solo administradores pueden actualizar tickets (para responder o cambiar estado)
 create policy "Administradores pueden actualizar tickets" 
   on public.tickets for update 
   using (
+    auth.jwt()->>'email' = 'gorkaobiangolaso@gmail.com' or
     exists (
-      select 1 from public.profiles where id = auth.uid() and role = 'admin'
+      select 1 from public.profiles where id = auth.uid() and role in ('admin', 'superadmin')
     )
   );
 
@@ -168,6 +181,38 @@ alter table public.colaboradores_solicitudes enable row level security;
 create policy "Permitir crear solicitudes de colaboracion a todos"
   on public.colaboradores_solicitudes for insert
   with check (true);
+
+-- 15. Tabla para artículos del blog docente y optimización SEO
+create table if not exists public.articles (
+  id uuid default gen_random_uuid() primary key,
+  title text not null,
+  slug text unique not null,
+  content text not null,
+  seo_description text,
+  keywords text,
+  category text default 'General',
+  author_email text default 'gorkaobiangolaso@gmail.com',
+  image_url text,
+  published boolean default true,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Habilitar RLS en artículos
+alter table public.articles enable row level security;
+
+-- Lectura pública para artículos publicados
+create policy "Lectura pública de artículos" on public.articles
+  for select using (published = true or auth.jwt()->>'email' = 'gorkaobiangolaso@gmail.com');
+
+-- Gestión de artículos para administradores y profesores
+create policy "Gestión total de artículos para administradores" on public.articles
+  for all using (
+    auth.jwt()->>'email' = 'gorkaobiangolaso@gmail.com' or
+    exists (
+      select 1 from public.profiles where id = auth.uid() and role in ('admin', 'superadmin', 'author')
+    )
+  );
 
 
 

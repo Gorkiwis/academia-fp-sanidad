@@ -25,6 +25,7 @@ import {
   FileText
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
+import { useAuth } from '../context/AuthContext';
 
 const DEGREES = [
   {
@@ -264,7 +265,11 @@ const INITIAL_DEMO_TICKETS = [
 
 export default function StudentProfile({ userPlan = 'free', setUserPlan, onOpenTicketModal }) {
   const navigate = useNavigate();
-  const isProMax = userPlan === 'promax';
+  const { user, role, isSuperadmin, isPremium } = useAuth();
+  
+  const currentEmail = user?.email || localStorage.getItem('academia_student_email') || '';
+  const isTargetSuperadmin = currentEmail.toLowerCase().trim() === 'gorkaobiangolaso@gmail.com' || isSuperadmin || role === 'superadmin';
+  const isProMax = userPlan === 'promax' || isPremium || isTargetSuperadmin;
 
   // Active Tab: 'account' | 'subscription' | 'progress' | 'tickets'
   const [activeTab, setActiveTab] = useState('account');
@@ -714,14 +719,14 @@ export default function StudentProfile({ userPlan = 'free', setUserPlan, onOpenT
                 </div>
                 <div>
                   <h2 className="text-xl font-extrabold text-slate-900">Bloque 2: Suscripción y Pagos</h2>
-                  <p className="text-xs text-slate-500">Plan actual, fecha de renovación y gestión de facturación vía Stripe.</p>
+                  <p className="text-xs text-slate-500">Plan mensual contratado, ID de cliente Stripe y gestión de facturación sin matrícula inicial.</p>
                 </div>
               </div>
             </div>
 
             {/* Plan Info Card */}
             <div className={`p-6 sm:p-8 rounded-2xl border transition-all ${
-              isProMax
+              planType === 'total' || isProMax
                 ? 'bg-amber-50/70 border-amber-300 ring-2 ring-amber-300/40'
                 : 'bg-slate-50 border-slate-200'
             }`}>
@@ -729,53 +734,67 @@ export default function StudentProfile({ userPlan = 'free', setUserPlan, onOpenT
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-mono uppercase tracking-wider text-slate-500 font-bold">
-                      Estado de Suscripción:
+                      Estado de Suscripción Mensual:
                     </span>
-                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-bold">
-                      ACTIVO
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                      subscriptionStatus === 'active' || isSuperadmin
+                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                        : 'bg-rose-100 text-rose-800 border-rose-300'
+                    }`}>
+                      {(subscriptionStatus || 'active').toUpperCase()}
                     </span>
                   </div>
                   <h3 className="text-2xl font-extrabold text-slate-900 flex items-center gap-2">
-                    {isProMax ? 'Plan PRO MAX (Acceso Total + Soporte)' : 'Plan Estándar (Apuntes & Contenidos)'}
+                    {planType === 'total' || isProMax
+                      ? 'Plan Total / Premium (Acceso Ilimitado)'
+                      : planType === 'pro'
+                      ? 'Plan Profesional (2-3 Módulos FP)'
+                      : 'Plan Básico (1 Módulo FP)'}
                   </h3>
                   <p className="text-xs text-slate-600">
-                    {isProMax
-                      ? 'Acceso instantáneo a todos los módulos y consultas ilimitadas con tutores sanitarios.'
-                      : 'Acceso a los módulos en formato goteo (Drip Content) y descargas PDF.'}
+                    Suscripción recurrente mensual sin cuota de alta ni matrícula inicial.
                   </p>
                 </div>
 
                 <div className="text-right shrink-0">
                   <span className="text-3xl font-extrabold text-slate-900">
-                    {isProMax ? '39,00 €' : '19,00 €'}
+                    {planType === 'total' || isProMax ? '69,00 €' : planType === 'pro' ? '39,00 €' : '19,00 €'}
                   </span>
                   <span className="text-xs text-slate-500 block font-medium">/ mes</span>
+                  <span className="text-[10px] text-emerald-600 font-bold block mt-0.5">Matrícula: 0,00 €</span>
                 </div>
               </div>
 
               {/* Subscription details grid */}
-              <div className="grid sm:grid-cols-3 gap-4 pt-6 text-xs text-slate-700">
+              <div className="grid sm:grid-cols-4 gap-4 pt-6 text-xs text-slate-700">
+                <div className="bg-white p-4 rounded-xl border border-slate-200/80 space-y-1">
+                  <span className="text-slate-400 font-semibold block text-[11px]">ID Cliente Stripe:</span>
+                  <div className="flex items-center gap-1.5 font-bold text-slate-900 text-xs font-mono truncate">
+                    <span>{stripeCustomerId || 'cus_demo98721'}</span>
+                  </div>
+                </div>
+
                 <div className="bg-white p-4 rounded-xl border border-slate-200/80 space-y-1">
                   <span className="text-slate-400 font-semibold block text-[11px]">Próxima Renovación:</span>
-                  <div className="flex items-center gap-1.5 font-bold text-slate-900 text-sm">
-                    <Calendar className="w-4 h-4 text-slate-700" />
+                  <div className="flex items-center gap-1.5 font-bold text-slate-900 text-xs">
+                    <Calendar className="w-3.5 h-3.5 text-slate-700" />
                     <span>{formattedRenewalDate}</span>
                   </div>
                 </div>
 
                 <div className="bg-white p-4 rounded-xl border border-slate-200/80 space-y-1">
                   <span className="text-slate-400 font-semibold block text-[11px]">Método de Pago:</span>
-                  <div className="flex items-center gap-1.5 font-bold text-slate-900 text-sm">
-                    <CreditCard className="w-4 h-4 text-slate-700" />
+                  <div className="flex items-center gap-1.5 font-bold text-slate-900 text-xs">
+                    <CreditCard className="w-3.5 h-3.5 text-slate-700" />
                     <span>Visa •••• 4242</span>
                   </div>
                 </div>
 
                 <div className="bg-white p-4 rounded-xl border border-slate-200/80 space-y-1">
                   <span className="text-slate-400 font-semibold block text-[11px]">Facturación:</span>
-                  <div className="flex items-center gap-1.5 font-bold text-slate-900 text-sm">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    <span>Recibo al día (Stripe)</span>
+                  <div className="flex items-center gap-1.5 font-bold text-slate-900 text-xs">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Al día (Stripe Portal)</span>
                   </div>
                 </div>
               </div>
@@ -783,14 +802,14 @@ export default function StudentProfile({ userPlan = 'free', setUserPlan, onOpenT
               {/* Stripe Customer Portal Redirect CTA */}
               <div className="pt-6 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
                 <p className="text-xs text-slate-600">
-                  Puedes modificar tu tarjeta, descargar facturas en PDF o cancelar tu suscripción en cualquier momento desde la pasarela segura de Stripe.
+                  Accede al Stripe Customer Portal para gestionar la tarjeta de crédito, cambiar el número de módulos contratados o cancelar la suscripción mensual.
                 </p>
 
                 <button
                   onClick={handleStripePortalRedirect}
                   className="w-full sm:w-auto px-6 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-md shrink-0"
                 >
-                  <span>Gestionar Método de Pago o Cancelar</span>
+                  <span>Gestionar Suscripción en Stripe Portal</span>
                   <ExternalLink className="w-4 h-4" />
                 </button>
               </div>
