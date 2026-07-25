@@ -17,7 +17,14 @@ values ('default_config', '19', 'https://buy.stripe.com/test_plan_basic', '39', 
 on conflict (id) do nothing;
 
 
--- 2. Tabla de perfiles de usuario (profiles)
+-- 2. Tipo ENUM de Roles RBAC
+do $$ begin
+  create type public.app_role as enum ('student', 'legal_admin', 'super_admin');
+exception
+  when duplicate_object then null;
+end $$;
+
+-- 3. Tabla de perfiles de usuario (profiles)
 create table if not exists public.profiles (
   id uuid references auth.users on delete cascade primary key,
   nombre text not null,
@@ -25,7 +32,7 @@ create table if not exists public.profiles (
   grado text not null,
   municipio text not null,
   centro_estudios text not null,
-  role text default 'student',
+  role public.app_role default 'student'::public.app_role,
   stripe_customer_id text,
   subscription_status text default 'active', -- 'active', 'canceled', 'past_due'
   subscribed_module_ids text[] default '{"mod_1", "mod_2"}',
@@ -33,10 +40,10 @@ create table if not exists public.profiles (
   created_at timestamp with time zone default timezone('utc'::text, now())
 );
 
--- 3. Habilitar seguridad por filas (RLS)
+-- 4. Habilitar seguridad por filas (RLS)
 alter table public.profiles enable row level security;
 
--- 4. Políticas de acceso (RLS Policies)
+-- 5. Políticas de acceso (RLS Policies)
 create policy "Los usuarios pueden ver su propio perfil" 
   on public.profiles for select 
   using (auth.uid() = id);
@@ -51,7 +58,7 @@ create policy "Administradores tienen acceso total"
     auth.jwt()->>'email' = 'gorkaobiangolaso@gmail.com' or
     exists (
       select 1 from public.profiles 
-      where id = auth.uid() and role in ('admin', 'superadmin')
+      where id = auth.uid() and role in ('legal_admin'::public.app_role, 'super_admin'::public.app_role)
     )
   );
 
@@ -214,7 +221,75 @@ create policy "Gestión total de artículos para administradores" on public.arti
     )
   );
 
+-- 16. Tablas para Documentos Legales y RBAC
+create table if not exists public.legal_documents (
+  id uuid default gen_random_uuid() primary key,
+  title text not null,
+  document_type text not null check (document_type in ('terms_of_service', 'privacy_policy', 'legal_notice', 'cookies_policy', 'disclaimer')),
+  content text not null,
+  version text default '1.0' not null,
+  is_active boolean default true not null,
+  updated_by uuid references auth.users(id) on delete set null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
 
+create table if not exists public.legal_settings (
+  id text primary key default 'default_legal_settings',
+  company_name text default 'Academia FP Sanidad S.L.',
+  cif_nif text default 'B-12345678',
+  dpo_email text default 'legal@academiafpsanidad.es',
+  address text default 'Calle Sanidad 12, 28001 Madrid, España',
+  updated_by uuid references auth.users(id) on delete set null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
 
+alter table public.legal_documents enable row level security;
+alter table public.legal_settings enable row level security;
 
+-- Funciones auxiliares RLS Security Definer
+create or replace function public.is_legal_admin(user_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 
+    from public.profiles 
+    where id = user_id 
+      and role = 'legal_admin'::public.app_role
+  );
+$$;
 
+-- Políticas RLS estrictas para legal_documents (solo legal_admin puede INSERT/UPDATE)
+create policy "Lectura pública de documentos legales activos"
+  on public.legal_documents for select
+  using (is_active = true or public.is_legal_admin(auth.uid()));
+
+create policy "Solo legal_admin puede insertar documentos legales"
+  on public.legal_documents for insert
+  with check (public.is_legal_admin(auth.uid()));
+
+create policy "Solo legal_admin puede actualizar documentos legales"
+  on public.legal_documents for update
+  using (public.is_legal_admin(auth.uid()))
+  with check (public.is_legal_admin(auth.uid()));
+
+create policy "Solo legal_admin puede eliminar documentos legales"
+  on public.legal_documents for delete
+  using (public.is_legal_admin(auth.uid()));
+
+-- Políticas RLS estrictas para legal_settings
+create policy "Lectura de configuracion legal"
+  on public.legal_settings for select
+  using (true);
+
+create policy "Solo legal_admin puede insertar configuracion legal"
+  on public.legal_settings for insert
+  with check (public.is_legal_admin(auth.uid()));
+
+create policy "Solo legal_admin puede actualizar configuracion legal"
+  on public.legal_settings for update
+  using (public.is_legal_admin(auth.uid()))
+  with check (public.is_legal_admin(auth.uid()));
