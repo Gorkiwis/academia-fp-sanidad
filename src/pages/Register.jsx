@@ -27,35 +27,22 @@ export default function Register() {
 
     try {
       if (isSupabaseConfigured()) {
-        // 1. Sign up user with Supabase Auth
+        // 1. Sign up user with Supabase Auth (passing profile metadata for DB trigger)
         const { data: authData, error: authError } = await supabase.auth.signUp({
           email: formData.email,
-          password: formData.password
+          password: formData.password,
+          options: {
+            data: {
+              first_name: formData.nombre,
+              last_name: formData.apellidos,
+              degree: formData.grado,
+              city: formData.municipio,
+              study_center: formData.centro_estudios
+            }
+          }
         });
 
         if (authError) throw authError;
-
-        const userId = authData.user?.id;
-
-        if (userId) {
-          // 2. Insert user profile into 'profiles' table
-          const { error: profileError } = await supabase.from('profiles').insert([
-            {
-              id: userId,
-              nombre: formData.nombre,
-              apellidos: formData.apellidos,
-              grado: formData.grado,
-              municipio: formData.municipio,
-              centro_estudios: formData.centro_estudios,
-              role: 'student',
-              created_at: new Date().toISOString()
-            }
-          ]);
-
-          if (profileError) {
-            console.warn('Profile insert error:', profileError.message);
-          }
-        }
       } else {
         // Demo storage fallback
         const existingUsers = JSON.parse(localStorage.getItem('academia_profiles') || '[]');

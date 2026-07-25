@@ -5,6 +5,8 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Campus from './pages/Campus';
 import Admin from './pages/Admin';
+import RecuperarPassword from './pages/RecuperarPassword';
+import ActualizarPassword from './pages/ActualizarPassword';
 import { supabase } from './lib/supabase';
 
 const GRADOS = [
@@ -261,6 +263,8 @@ export default function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/campus" element={<Campus />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/recuperar-password" element={<RecuperarPassword />} />
+        <Route path="/actualizar-password" element={<ActualizarPassword />} />
       </Routes>
     </BrowserRouter>
   );
